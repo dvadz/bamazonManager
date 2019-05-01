@@ -8,6 +8,12 @@ var bamazonApp = {
     quantity: 0,        //quantity to be added to existing to the item_id
     response:   {},
     inventory : [],
+    newProduct: {
+        product_name: "",
+        department_name: "",
+        price: 0,
+        stock_quantity: 0
+    }
 }
 
 function bamazonManager() {
@@ -125,20 +131,74 @@ function selectQuantity(){
             let newQuantity = bamazonApp.response[bamazonApp.itemIndex].stock_quantity;
             // console.table(bamazonApp.response);
             // update the database
-            let query = `UPDATE products SET stock_quantity = ${newQuantity} WHERE item_id = ${bamazonApp.item_id}`
+            let query = "UPDATE products SET stock_quantity = ? WHERE item_id = ?"
+            let params = [newQuantity, bamazonApp.item_id];
             //clear the action to prevent a redirect
             bamazonApp.action = "";
-            makeAnSQLQuery(query);
+            makeAnSQLQuery(query, params);
         }
     });
 }
 
 // "Add New Product" ===========================================
 function addNewProduct() {
+    //just creating some space
+    console.log("");
 
+    //ask for name
+    inquirer.prompt({
+        type: "input",
+        name: "product_name",
+        message: "Product Name? "
+    })
+    .then(function(answer){
+        bamazonApp.newProduct.product_name = answer.product_name;
+        provideDepartment();
+    });
 }
 
-function makeAnSQLQuery(query) {
+function provideDepartment() {
+    //ask for name
+    inquirer.prompt({
+        type: "input",
+        name: "department_name",
+        message: "Department? "
+    })
+    .then(function(answer){
+        bamazonApp.newProduct.department_name = answer.department_name;
+        providePrice();
+    });
+}
+
+function providePrice() {
+    //ask for name
+    inquirer.prompt({
+        type: "number",
+        name: "price",
+        message: "Price? "
+    })
+    .then(function(answer){
+        bamazonApp.newProduct.price = answer.price;
+        provideQuantity();
+    });
+}
+
+function provideQuantity() {
+    //ask for name
+    inquirer.prompt({
+        type: "number",
+        name: "stock_quantity",
+        message: "Quantity? "
+    })
+    .then(function(answer){
+        bamazonApp.newProduct.stock_quantity = answer.stock_quantity;
+
+        addNewProductToDatabase();
+    });
+}
+
+// SQL =============================================================
+function makeAnSQLQuery(query, params) {
 
     // TODO: secure your password
     var connection = mysql.createConnection({
@@ -156,7 +216,8 @@ function makeAnSQLQuery(query) {
         }
     
         connection.query(
-            query, 
+            query,
+            params,
             function(error, response){
                 if(error){
                     console.log(">>>> ERROR READING FROM DATABASE <<<<");
@@ -175,6 +236,69 @@ function makeAnSQLQuery(query) {
 
 }
 
+function addNewProductToDatabase(query, params) {
+
+    // TODO: secure your password
+    var connection = mysql.createConnection({
+        host: "localhost",
+        port: 3306,
+        user: "root",
+        password: "password",
+        database: "bamazon"    
+    });
+
+    connection.connect(function(error){
+        if(error) {
+            console.log("ERROR setting up database connection");
+            throw error;
+        }
+    
+        //get max id
+        var max_id = 0;
+        connection.query(
+            "SELECT MAX(item_id) FROM products",
+            function(error, response){
+                if(error){
+                    console.log(">>>> ERROR READING FROM DATABASE <<<<");
+                    console.log(error.sql);
+                    throw error;
+                }
+                max_id = parseInt(response[0]["MAX(item_id)"]) + 1;
+                
+                let query = "INSERT INTO products(item_id, product_name, department_name, price, stock_quantity) VALUES(?, ?, ?, ?, ?)"
+                let params = [
+                    max_id,
+                    bamazonApp.newProduct.product_name,
+                    bamazonApp.newProduct.department_name,
+                    bamazonApp.newProduct.price,
+                    bamazonApp.newProduct.stock_quantity
+                ];
+                connection.query(
+                    query,
+                    params,
+                    function(error, response){
+                        if(error){
+                            console.log(">>>> ERROR READING FROM DATABASE <<<<");
+                            console.log(error.sql);
+                            throw error;
+                        }
+        
+                        //store the reponse
+                        // bamazonApp.response = response;
+        
+                    }
+                );
+
+                connection.end();
+
+            }
+        );
+
+        
+    });
+
+}
+
 function redirectAfterMakingTheQuery(){
 
     if(bamazonApp.action==="View Products for Sale") {
@@ -184,7 +308,7 @@ function redirectAfterMakingTheQuery(){
     }else if(bamazonApp.action==="Add to Inventory") {
         askWhichProductToRestock();
     } else if(bamazonApp.action==="Add New Product") {
-
+        //none
     }
 }
 
